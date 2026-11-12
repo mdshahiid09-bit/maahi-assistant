@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,8 +26,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -278,25 +277,29 @@ fun ChatBubble(
     ) {
         // "Searching…" chip
         if (isSearching) {
-            AssistChip(
-                onClick = {},
-                label = { Text("Searching…", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
-                leadingIcon = {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_search),
-                        contentDescription = "Searching",
-                        tint = OrbGold,
-                        modifier = Modifier.size(14.dp)
-                    )
-                },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = ClaySurface,
-                    labelColor = ClayTextPrimary
-                ),
-                border = AssistChipDefaults.assistChipBorder(borderColor = ClayBorder),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .padding(bottom = 6.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ClaySurface)
+                    .border(1.dp, ClayBorder, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_search),
+                    contentDescription = "Searching",
+                    tint = OrbGold,
+                    modifier = Modifier.size(13.dp)
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(
+                    text = "Searching…",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ClayTextPrimary
+                )
+            }
         }
 
         if (text.isNotEmpty() || isStreaming) {
