@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Maahi</string>
+    <string name="notification_channel_name">Maahi session</string>
+    <string name="notification_channel_desc">Active real-time voice session with Maahi</string>
+    <string name="session_listening">Maahi is listening...</string>
+    <string name="session_speaking">Maahi is speaking...</string>
+    <string name="action_mute">Mute</string>
+    <string name="action_unmute">Unmute</string>
+    <string name="action_end_call">End call</string>
+</resources>

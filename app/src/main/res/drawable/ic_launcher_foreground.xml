@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Glowing rings and neural core -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M 54,24 A 30,30 0 1,0 54,84 A 30,30 0 1,0 54,24" />
+    <path
+        android:strokeColor="#FFD700"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M 54,34 A 20,20 0 1,0 54,74 A 20,20 0 1,0 54,34" />
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M 54,48 A 6,6 0 1,0 54,60 A 6,6 0 1,0 54,48" />
+    <!-- Floating nodes -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 32,54 A 3,3 0 1,0 32,54.1 Z
+                          M 76,54 A 3,3 0 1,0 76,54.1 Z
+                          M 54,32 A 3,3 0 1,0 54,32.1 Z
+                          M 54,76 A 3,3 0 1,0 54,76.1 Z" />
+</vector>
