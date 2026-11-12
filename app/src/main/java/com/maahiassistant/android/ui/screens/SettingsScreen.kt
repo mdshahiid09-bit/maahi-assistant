@@ -66,6 +66,7 @@ import com.maahiassistant.android.ui.KeyTestState
 import com.maahiassistant.android.ui.MainViewModel
 import com.maahiassistant.android.ui.components.ConfirmDialog
 import com.maahiassistant.android.ui.components.DrawerDestination
+import com.maahiassistant.android.ui.theme.ClayBackground
 import com.maahiassistant.android.ui.theme.ClayBlueAccent
 import com.maahiassistant.android.ui.theme.ClayBlueContainer
 import com.maahiassistant.android.ui.theme.ClayBorder

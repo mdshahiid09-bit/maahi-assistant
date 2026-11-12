@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberDrawerState
@@ -28,8 +30,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.core.content.ContextCompat
 import com.maahiassistant.android.MaahiApplication
+import com.maahiassistant.android.R
 import com.maahiassistant.android.ui.components.BottomTab
 import com.maahiassistant.android.ui.components.DrawerDestination
 import com.maahiassistant.android.ui.components.EdgeGlow
@@ -45,6 +49,7 @@ import com.maahiassistant.android.ui.screens.OnboardingScreen
 import com.maahiassistant.android.ui.screens.SettingsScreen
 import com.maahiassistant.android.ui.screens.YaadeinScreen
 import com.maahiassistant.android.ui.theme.ClayBackground
+import com.maahiassistant.android.ui.theme.ClayBlueAccent
 import com.maahiassistant.android.ui.theme.MaahiTheme
 import kotlinx.coroutines.launch
 

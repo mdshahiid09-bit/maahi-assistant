@@ -92,6 +92,7 @@ class MainViewModel(
             DrawerDestination.HOME -> _currentTab.value = BottomTab.HOME
             DrawerDestination.CHAT -> _currentTab.value = BottomTab.CHAT
             DrawerDestination.SETTINGS -> _currentTab.value = BottomTab.SETTINGS
+            DrawerDestination.LIVE_LOGS -> { /* Handled in drawer / view */ }
             DrawerDestination.CHAT_HISTORY -> { /* Handled in drawer / view */ }
             DrawerDestination.HELP_GUIDE -> { /* Handled in drawer / view */ }
         }
