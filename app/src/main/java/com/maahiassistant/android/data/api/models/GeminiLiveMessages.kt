@@ -30,7 +30,7 @@ object GeminiLiveMessages {
         val root = JSONObject()
         val setup = JSONObject()
 
-        val cleanModel = modelId.trim().ifEmpty { "gemini-2.0-flash-exp" }
+        val cleanModel = modelId.trim().ifEmpty { "gemini-3.8-live" }
         val formattedModel = if (cleanModel.startsWith("models/")) cleanModel else "models/$cleanModel"
         setup.put("model", formattedModel)
 

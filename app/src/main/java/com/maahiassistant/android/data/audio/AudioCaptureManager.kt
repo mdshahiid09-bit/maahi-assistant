@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
+import com.maahiassistant.android.data.local.LiveLogManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -55,13 +56,16 @@ class AudioCaptureManager(
             )
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                onError("Failed to initialize microphone hardware")
+                val err = "Failed to initialize microphone hardware"
+                LiveLogManager.error("AudioRecord", err)
+                onError(err)
                 release()
                 return
             }
 
             audioRecord?.startRecording()
             isRecording.set(true)
+            LiveLogManager.info("AudioRecord", "Microphone recording started (16000Hz PCM Mono)")
 
             captureJob = scope.launch(Dispatchers.IO) {
                 val buffer = ByteArray(CHUNK_SIZE_BYTES)
@@ -89,9 +93,11 @@ class AudioCaptureManager(
 
     fun setMute(muted: Boolean) {
         isMuted.set(muted)
+        LiveLogManager.info("AudioRecord", "Microphone mute toggled: $muted")
     }
 
     fun stop() {
+        if (!isRecording.get()) return
         isRecording.set(false)
         captureJob?.cancel()
         captureJob = null
@@ -102,6 +108,8 @@ class AudioCaptureManager(
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping AudioRecord", e)
         }
+        LiveLogManager.info("AudioRecord", "Microphone recording stopped cleanly")
+    }
     }
 
     fun release() {

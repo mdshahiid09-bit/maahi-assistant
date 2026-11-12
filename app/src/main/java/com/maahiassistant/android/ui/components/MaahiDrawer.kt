@@ -40,6 +40,7 @@ enum class DrawerDestination(val title: String, val iconRes: Int) {
     HOME("Home", R.drawable.ic_home),
     CHAT("Chat", R.drawable.ic_chat),
     CHAT_HISTORY("Chat history", R.drawable.ic_history),
+    LIVE_LOGS("Live logs", R.drawable.ic_terminal),
     HELP_GUIDE("Help and guide", R.drawable.ic_help),
     SETTINGS("Settings", R.drawable.ic_settings)
 }
@@ -135,7 +136,7 @@ fun MaahiDrawerSheet(
 
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = "Maahi v1.0.2 (Phase 1)",
+                text = "Maahi v1.0.3 (Phase 1)",
                 fontSize = 11.sp,
                 color = ClayTextSecondary,
                 modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)

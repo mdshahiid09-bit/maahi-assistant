@@ -54,10 +54,15 @@ Maahi is an intelligent, conversational voice assistant for Android, built with 
 * Sessions continue uninterrupted when the app is minimized.
 * Automatic network monitoring: detects disconnections, displays `"No connection, retrying…"`, and restores session context using **Gemini Session Resumption** tokens (displaying a `"Reconnected"` note in chat).
 
+### In-App Live Diagnostics & Logs
+* **Real-Time Live Logs Screen:** Dedicated in-app diagnostics accessible from the navigation drawer, top bar terminal icon, or Settings.
+* **Monitors Everything:** WebSocket connection handshakes, setup JSON payloads, `setupComplete` confirmations, inbound audio chunk byte sizes, real-time speech transcriptions, server error payloads, close codes, and microphone states.
+* **Diagnostics Tools:** Filter by `ALL`, `ERRORS`, `WEBSOCKET`, `AUDIO`, `GEMINI`, plus one-click "Copy All Logs" (to clipboard) and "Clear Logs".
+
 ### Settings & Security
 * **Encrypted API Key Storage:** Stored using `EncryptedSharedPreferences` backed by the Android Keystore.
 * **Save & Test Key:** Validates the key with a real minimal REST call to Google AI Studio, queries the models list endpoint, automatically discovers models supporting `bidiGenerateContent`, and displays real API feedback. Includes a "How to get your key" guide and an "Open Google AI Studio" button.
-* **Live Model ID:** Configurable model identifier (default: `gemini-2.0-flash-exp`, auto-updated when testing key).
+* **Live Model ID:** Configurable Gemini Live audio-to-audio model identifier (default: `gemini-3.8-live`, with quick chips for `gemini-3.8-live`, `gemini-3.8-live-extended-thinking`, and `gemini-2.0-flash-exp`).
 * **Voice Selection:** Choose between `Kore` (default), `Puck`, `Charon`, `Fenrir`, or `Aoede`.
 * **Speaker / Earpiece Switch:** Toggle default audio routing.
 * **Keep Screen Awake:** Keeps screen illuminated during active voice sessions.

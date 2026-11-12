@@ -56,7 +56,7 @@ class MainViewModel(
 
     // Settings
     val modelId: StateFlow<String> = settingsRepository.modelId
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gemini-2.0-flash-exp")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gemini-3.8-live")
 
     val voice: StateFlow<String> = settingsRepository.voice
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Kore")

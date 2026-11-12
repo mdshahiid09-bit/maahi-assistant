@@ -8,6 +8,7 @@ import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.Build
 import android.util.Log
+import com.maahiassistant.android.data.local.LiveLogManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -97,6 +98,7 @@ class AudioPlaybackManager(
 
         audioTrack?.play()
         isRunning.set(true)
+        LiveLogManager.info("AudioTrack", "AudioTrack initialized at 24000Hz PCM Mono STREAM mode")
 
         playbackJob = scope.launch(Dispatchers.IO) {
             while (isActive && isRunning.get()) {
@@ -142,9 +144,11 @@ class AudioPlaybackManager(
         }
         onSpeakingState(false, 0f)
         audioFocusHelper.abandonFocus()
+        LiveLogManager.warn("AudioTrack", "Barge-in triggered: AudioTrack paused & flushed")
     }
 
     fun stop() {
+        if (!isRunning.get()) return
         isRunning.set(false)
         playbackJob?.cancel()
         playbackJob = null
@@ -158,6 +162,8 @@ class AudioPlaybackManager(
         }
         audioFocusHelper.abandonFocus()
         onSpeakingState(false, 0f)
+        LiveLogManager.info("AudioTrack", "AudioTrack stopped cleanly")
+    }
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

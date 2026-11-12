@@ -40,6 +40,7 @@ import com.maahiassistant.android.ui.screens.ChatHistoryScreen
 import com.maahiassistant.android.ui.screens.ChatScreen
 import com.maahiassistant.android.ui.screens.HelpGuideScreen
 import com.maahiassistant.android.ui.screens.HomeScreen
+import com.maahiassistant.android.ui.screens.LiveLogsScreen
 import com.maahiassistant.android.ui.screens.OnboardingScreen
 import com.maahiassistant.android.ui.screens.SettingsScreen
 import com.maahiassistant.android.ui.screens.YaadeinScreen
@@ -171,6 +172,7 @@ fun MainAppContent(
                         DrawerDestination.HOME -> "Maahi"
                         DrawerDestination.CHAT -> "Chat"
                         DrawerDestination.CHAT_HISTORY -> "History"
+                        DrawerDestination.LIVE_LOGS -> "Live Logs"
                         DrawerDestination.HELP_GUIDE -> "Guide"
                         DrawerDestination.SETTINGS -> "Settings"
                     }
@@ -178,12 +180,26 @@ fun MainAppContent(
                         title = title,
                         onDrawerClick = {
                             coroutineScope.launch { drawerState.open() }
+                        },
+                        actions = {
+                            if (currentDrawerDestination != DrawerDestination.LIVE_LOGS) {
+                                IconButton(
+                                    onClick = { viewModel.selectDrawerDestination(DrawerDestination.LIVE_LOGS) }
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_terminal),
+                                        contentDescription = "Live Logs",
+                                        tint = ClayBlueAccent
+                                    )
+                                }
+                            }
                         }
                     )
                 },
                 bottomBar = {
                     if (currentDrawerDestination != DrawerDestination.CHAT_HISTORY &&
-                        currentDrawerDestination != DrawerDestination.HELP_GUIDE
+                        currentDrawerDestination != DrawerDestination.HELP_GUIDE &&
+                        currentDrawerDestination != DrawerDestination.LIVE_LOGS
                     ) {
                         MaahiBottomBar(
                             currentTab = currentTab,
@@ -222,6 +238,11 @@ fun MainAppContent(
                         .padding(innerPadding)
                 ) {
                     when {
+                        currentDrawerDestination == DrawerDestination.LIVE_LOGS -> {
+                            LiveLogsScreen(
+                                onBack = { viewModel.selectDrawerDestination(DrawerDestination.HOME) }
+                            )
+                        }
                         currentDrawerDestination == DrawerDestination.CHAT_HISTORY -> {
                             ChatHistoryScreen(
                                 viewModel = viewModel,

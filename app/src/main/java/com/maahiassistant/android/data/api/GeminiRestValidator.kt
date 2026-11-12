@@ -1,5 +1,6 @@
 package com.maahiassistant.android.data.api
 
+import com.maahiassistant.android.data.local.LiveLogManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -26,6 +27,7 @@ class GeminiRestValidator(
             return@withContext Result.failure(IllegalArgumentException("API key cannot be empty"))
         }
 
+        LiveLogManager.info("Validator", "Validating key against Google AI Studio models endpoint...")
         val url = "https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey.trim()}"
         val request = Request.Builder()
             .url(url)
@@ -56,21 +58,27 @@ class GeminiRestValidator(
                             }
                         }
                     } catch (e: Exception) {
-                        // ignore JSON parse issue for models list
+                        LiveLogManager.warn("Validator", "Failed to parse models json: ${e.message}")
                     }
+
+                    LiveLogManager.success("Validator", "API key HTTP 200 OK. bidiGenerateContent models: $bidiModels")
 
                     // Select the best model that supports bidiGenerateContent
                     val pickedModel = when {
+                        bidiModels.contains("gemini-3.8-live") -> "gemini-3.8-live"
+                        bidiModels.contains("gemini-3.8-live-extended-thinking") -> "gemini-3.8-live-extended-thinking"
                         bidiModels.contains("gemini-2.0-flash-exp") -> "gemini-2.0-flash-exp"
-                        bidiModels.any { it.contains("flash") && it.contains("2.0") } -> bidiModels.first { it.contains("flash") && it.contains("2.0") }
+                        bidiModels.any { it.contains("3.8") } -> bidiModels.first { it.contains("3.8") }
+                        bidiModels.any { it.contains("live") } -> bidiModels.first { it.contains("live") }
+                        bidiModels.any { it.contains("flash") } -> bidiModels.first { it.contains("flash") }
                         bidiModels.isNotEmpty() -> bidiModels.first()
-                        else -> "gemini-2.0-flash-exp"
+                        else -> "gemini-3.8-live"
                     }
 
                     val msg = if (bidiModels.isNotEmpty()) {
-                        "API key verified! Live model discovered: $pickedModel"
+                        "API key verified! Live voice model: $pickedModel"
                     } else {
-                        "API key verified successfully! (Default live model: $pickedModel)"
+                        "API key verified successfully! (Default live voice model: $pickedModel)"
                     }
 
                     Result.success(KeyValidationResult(msg, pickedModel, bidiModels))

@@ -5,7 +5,9 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +65,7 @@ import com.maahiassistant.android.R
 import com.maahiassistant.android.ui.KeyTestState
 import com.maahiassistant.android.ui.MainViewModel
 import com.maahiassistant.android.ui.components.ConfirmDialog
+import com.maahiassistant.android.ui.components.DrawerDestination
 import com.maahiassistant.android.ui.theme.ClayBlueAccent
 import com.maahiassistant.android.ui.theme.ClayBlueContainer
 import com.maahiassistant.android.ui.theme.ClayBorder
@@ -379,13 +382,13 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
-                    text = "Live Model ID",
+                    text = "Live Voice Model",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = ClayTextPrimary
                 )
                 Text(
-                    text = "Gemini multimodal live streaming model (default gemini-2.0-flash-exp or auto-detected)",
+                    text = "Gemini Live audio-to-audio model (default gemini-3.8-live)",
                     fontSize = 11.5.sp,
                     color = ClayTextSecondary
                 )
@@ -408,6 +411,36 @@ fun SettingsScreen(
                             unfocusedBorderColor = ClayBorder
                         )
                     )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                val quickModels = listOf("gemini-3.8-live", "gemini-3.8-live-extended-thinking", "gemini-2.0-flash-exp")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    quickModels.forEach { modelOption ->
+                        val isSelected = modelIdInput.trim() == modelOption
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) ClayBlueContainer else ClayBackground)
+                                .border(1.dp, if (isSelected) ClayBlueAccent else ClayBorder, RoundedCornerShape(8.dp))
+                                .clickable {
+                                    modelIdInput = modelOption
+                                    viewModel.updateModelId(modelOption)
+                                }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = modelOption,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) ClayBlueAccent else ClayTextPrimary
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -559,7 +592,51 @@ fun SettingsScreen(
         }
 
         // ==========================================
-        // CARD 6: Reset Settings & Delete All Data
+        // CARD 6: Live Diagnostics & Logs
+        // ==========================================
+        Card(
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = ClaySurface),
+            border = BorderStroke(1.dp, ClayBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp)
+            ) {
+                Text(
+                    text = "Live Diagnostics & Logs",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ClayTextPrimary
+                )
+                Text(
+                    text = "View real-time WebSocket connection frames, errors, microphone events, and audio streaming status",
+                    fontSize = 12.sp,
+                    color = ClayTextSecondary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { viewModel.selectDrawerDestination(DrawerDestination.LIVE_LOGS) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ClayBlueAccent),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_terminal),
+                        contentDescription = "Logs",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "View Live Logs", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        // ==========================================
+        // CARD 7: Reset Settings & Delete All Data
         // ==========================================
         Card(
             shape = RoundedCornerShape(22.dp),

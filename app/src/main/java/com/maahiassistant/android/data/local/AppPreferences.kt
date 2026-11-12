@@ -21,7 +21,7 @@ class AppPreferences(private val context: Context) {
         val KEY_KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
 
-        const val DEFAULT_MODEL_ID = "gemini-2.0-flash-exp"
+        const val DEFAULT_MODEL_ID = "gemini-3.8-live"
         const val DEFAULT_VOICE = "Kore"
         const val DEFAULT_USE_SPEAKER = true
         const val DEFAULT_KEEP_SCREEN_ON = true
@@ -29,8 +29,7 @@ class AppPreferences(private val context: Context) {
 
     val modelIdFlow: Flow<String> = context.appDataStore.data.map { prefs ->
         val raw = prefs[KEY_MODEL_ID] ?: DEFAULT_MODEL_ID
-        // Automatically migrate legacy or guessed model names to verified live model
-        if (raw == "gemini-3.8-live" || raw.isBlank()) DEFAULT_MODEL_ID else raw
+        if (raw.isBlank()) DEFAULT_MODEL_ID else raw
     }
 
     val voiceFlow: Flow<String> = context.appDataStore.data.map { prefs ->

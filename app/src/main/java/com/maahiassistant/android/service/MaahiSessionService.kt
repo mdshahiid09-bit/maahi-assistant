@@ -28,6 +28,7 @@ import com.maahiassistant.android.data.api.models.ServerTurnChunk
 import com.maahiassistant.android.data.api.models.SessionOrbState
 import com.maahiassistant.android.data.audio.AudioCaptureManager
 import com.maahiassistant.android.data.audio.AudioPlaybackManager
+import com.maahiassistant.android.data.local.LiveLogManager
 import com.maahiassistant.android.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -198,6 +199,7 @@ class MaahiSessionService : Service() {
         _orbState.value = SessionOrbState.CONNECTING
         _connectionStatus.value = ConnectionStatus.CONNECTING
         _errorMessage.value = null
+        LiveLogManager.info("Session", "Foreground session service started")
 
         val notification = buildNotification(isMuted = _isMuted.value, isSpeaking = false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -419,6 +421,7 @@ class MaahiSessionService : Service() {
             val voiceName = app.settingsRepository.voice.first()
 
             Log.i(TAG, "Connecting session with model='$modelId', voice='$voiceName'...")
+            LiveLogManager.info("Session", "Opening session with model='$modelId', voice='$voiceName'")
             webSocketClient?.connect(
                 apiKey = apiKey,
                 modelId = modelId,
