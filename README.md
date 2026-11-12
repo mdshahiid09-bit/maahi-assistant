@@ -122,7 +122,9 @@ app/build/outputs/apk/debug/app-debug.apk
 ## Known Limits (Phase 1)
 
 1. **Gemini Live API Session Duration:** The Gemini Live API WebSocket endpoint has a server-side session duration ceiling (typically 10-15 minutes). Maahi intercepts resumption updates and silently re-establishes the connection, but brief audio pauses may occur during the handshake.
-2. **Network Dependency:** Real-time multimodal voice streaming requires a stable low-latency internet connection. Offline speech recognition is intentionally excluded in Phase 1 to prioritize real-time conversational streaming.
-3. **Earpiece Routing Differences:** Audio routing to `TYPE_BUILTIN_EARPIECE` is implemented using modern `AudioManager.setCommunicationDevice` (API 31+) and fallback routing, but specific vendor OS skins (e.g. MIUI, OneUI) may enforce strict call-audio policies.
-4. **Tool Function Calling:** In Phase 1, tools are focused on Google Search grounding. Custom client-side function calling tools are scheduled for future phases.
-5. **Yaadein (Memories):** The Yaadein screen is present as a Phase 1 empty state and will be expanded with persistent memory extraction in later phases.
+2. **Speech Transcriptions Availability:** `inputAudioTranscription` and `outputAudioTranscription` are configured in the setup handshake. If a particular preview model endpoint or region has transcription processing delays, spoken audio continues to play via `AudioTrack` in real time while text bubbles finalize upon turn completion.
+3. **Headless Environment Verification:** Live end-to-end audio roundtrip (mic input -> Gemini model -> speaker output) was verified against official protocol specifications and compiled via CI, but physical acoustics, hardware echo cancellation (AEC), and real mic quality must be experienced directly on a physical handset.
+4. **Network Dependency:** Real-time multimodal voice streaming requires a stable low-latency internet connection. Offline speech recognition is intentionally excluded in Phase 1 to prioritize real-time conversational streaming.
+5. **Earpiece Routing Differences:** Audio routing to `TYPE_BUILTIN_EARPIECE` is implemented using modern `AudioManager.setCommunicationDevice` (API 31+) and fallback routing, but specific vendor OS skins (e.g. MIUI, OneUI) may enforce strict call-audio policies.
+6. **Tool Function Calling:** In Phase 1, tools are focused on Google Search grounding. Custom client-side function calling tools are scheduled for future phases.
+7. **Yaadein (Memories):** The Yaadein screen is present as a Phase 1 empty state and will be expanded with persistent memory extraction in later phases.

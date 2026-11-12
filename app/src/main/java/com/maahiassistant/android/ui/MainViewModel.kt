@@ -38,6 +38,7 @@ class MainViewModel(
     val isSpeakerOn: StateFlow<Boolean> = MaahiSessionService.isSpeakerOn
     val audioInputLevel: StateFlow<Float> = MaahiSessionService.audioInputLevel
     val audioOutputLevel: StateFlow<Float> = MaahiSessionService.audioOutputLevel
+    val currentUserText: StateFlow<String> = MaahiSessionService.currentUserText
     val currentAssistantText: StateFlow<String> = MaahiSessionService.currentAssistantText
     val isToolSearching: StateFlow<Boolean> = MaahiSessionService.isToolSearching
     val serviceErrorMessage: StateFlow<String?> = MaahiSessionService.errorMessage

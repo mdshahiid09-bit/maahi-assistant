@@ -12,6 +12,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -19,8 +20,13 @@ class GeminiLiveWebSocketClient(
     private val listener: LiveSessionListener
 ) {
 
+    companion object {
+        private const val TAG = "MaahiLive"
+    }
+
     interface LiveSessionListener {
         fun onConnected()
+        fun onSetupComplete()
         fun onServerChunk(chunk: ServerTurnChunk)
         fun onError(message: String, isAuthError: Boolean)
         fun onClosed(code: Int, reason: String)
@@ -29,10 +35,11 @@ class GeminiLiveWebSocketClient(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var webSocket: WebSocket? = null
     private val isConnected = AtomicBoolean(false)
+    private val isSetupComplete = AtomicBoolean(false)
 
     private val client = OkHttpClient.Builder()
         .pingInterval(15, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.MILLISECONDS) // Keep-alive for streaming
+        .readTimeout(0, TimeUnit.MILLISECONDS)
         .connectTimeout(15, TimeUnit.SECONDS)
         .build()
 
@@ -43,7 +50,7 @@ class GeminiLiveWebSocketClient(
         resumptionHandle: String? = null
     ) {
         if (apiKey.isBlank()) {
-            listener.onError("Missing Gemini API Key", true)
+            listener.onError("Missing Gemini API Key. Add it in Settings.", true)
             return
         }
 
@@ -56,18 +63,22 @@ class GeminiLiveWebSocketClient(
             .url(url)
             .build()
 
+        Log.i(TAG, "Opening WebSocket connection to Gemini Live API...")
+
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 isConnected.set(true)
-                Log.d(TAG, "WebSocket opened. Sending setup payload...")
+                isSetupComplete.set(false)
+                Log.i(TAG, "WebSocket connected successfully. Sending initial setup message...")
 
-                // Immediately send initial setup message
+                // Send setup message first
                 val setupPayload = GeminiLiveMessages.buildSetupMessage(
                     modelId = modelId,
                     voiceName = voiceName,
                     resumptionHandle = resumptionHandle
                 )
                 webSocket.send(setupPayload)
+
                 scope.launch {
                     listener.onConnected()
                 }
@@ -76,6 +87,19 @@ class GeminiLiveWebSocketClient(
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val chunk = GeminiLiveMessages.parseServerMessage(text)
                 if (chunk != null) {
+                    if (chunk.isSetupComplete) {
+                        isSetupComplete.set(true)
+                        scope.launch {
+                            listener.onSetupComplete()
+                        }
+                    }
+
+                    if (chunk.serverError != null) {
+                        scope.launch {
+                            listener.onError(chunk.serverError, false)
+                        }
+                    }
+
                     scope.launch {
                         listener.onServerChunk(chunk)
                     }
@@ -84,25 +108,40 @@ class GeminiLiveWebSocketClient(
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 isConnected.set(false)
+                isSetupComplete.set(false)
                 val code = response?.code ?: 0
-                val responseBody = try { response?.body?.string().orEmpty() } catch (e: Exception) { "" }
-                val isAuthError = code == 400 || code == 403 || responseBody.contains("API_KEY_INVALID")
+                val rawBody = try { response?.body?.string().orEmpty() } catch (e: Exception) { "" }
 
-                val errorDesc = when {
-                    isAuthError -> "Invalid Gemini API key or unauthorized"
+                var detailedError: String? = null
+                if (rawBody.isNotEmpty()) {
+                    try {
+                        val json = JSONObject(rawBody)
+                        val errObj = json.optJSONObject("error")
+                        detailedError = errObj?.optString("message") ?: json.optString("message")
+                    } catch (e: Exception) {
+                        detailedError = rawBody
+                    }
+                }
+
+                val isAuthError = code == 400 || code == 403 || (detailedError != null && detailedError.contains("API_KEY_INVALID", ignoreCase = true))
+
+                val finalError = when {
+                    detailedError != null -> "Gemini API error ($code): $detailedError"
+                    isAuthError -> "Invalid Gemini API key or unauthorized (HTTP $code)"
                     code != 0 -> "Connection failed (HTTP $code: ${response?.message})"
                     else -> t.message ?: "Connection failure"
                 }
 
-                Log.e(TAG, "WebSocket failure: $errorDesc", t)
+                Log.e(TAG, "WebSocket failure: $finalError", t)
                 scope.launch {
-                    listener.onError(errorDesc, isAuthError)
+                    listener.onError(finalError, isAuthError)
                 }
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 isConnected.set(false)
-                Log.d(TAG, "WebSocket closed: $code / $reason")
+                isSetupComplete.set(false)
+                Log.i(TAG, "WebSocket closed: code=$code, reason=$reason")
                 scope.launch {
                     listener.onClosed(code, reason)
                 }
@@ -110,9 +149,13 @@ class GeminiLiveWebSocketClient(
         })
     }
 
+    fun isReadyForAudio(): Boolean = isConnected.get() && isSetupComplete.get()
+
     fun sendAudioChunk(pcmBytes: ByteArray, offset: Int, length: Int): Boolean {
         val ws = webSocket ?: return false
-        if (!isConnected.get()) return false
+        if (!isConnected.get() || !isSetupComplete.get()) {
+            return false
+        }
         val message = GeminiLiveMessages.buildRealtimeAudioChunk(pcmBytes, offset, length)
         return ws.send(message)
     }
@@ -128,15 +171,12 @@ class GeminiLiveWebSocketClient(
 
     fun disconnect() {
         isConnected.set(false)
+        isSetupComplete.set(false)
         try {
             webSocket?.close(1000, "Normal closure")
         } catch (e: Exception) {
             // Ignore
         }
         webSocket = null
-    }
-
-    companion object {
-        private const val TAG = "GeminiLiveWS"
     }
 }

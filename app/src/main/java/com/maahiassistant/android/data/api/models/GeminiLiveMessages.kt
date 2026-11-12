@@ -1,19 +1,26 @@
 package com.maahiassistant.android.data.api.models
 
 import android.util.Base64
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 
 data class ServerTurnChunk(
-    val text: String? = null,
+    val isSetupComplete: Boolean = false,
+    val inputText: String? = null,
+    val outputText: String? = null,
     val audioBytes: ByteArray? = null,
     val isInterrupted: Boolean = false,
     val isTurnComplete: Boolean = false,
+    val isGenerationComplete: Boolean = false,
     val isSearching: Boolean = false,
-    val newResumptionHandle: String? = null
+    val newResumptionHandle: String? = null,
+    val serverError: String? = null
 )
 
 object GeminiLiveMessages {
+
+    private const val TAG = "MaahiLive"
 
     fun buildSetupMessage(
         modelId: String,
@@ -40,6 +47,10 @@ object GeminiLiveMessages {
         speechConfig.put("voiceConfig", voiceConfig)
         genConfig.put("speechConfig", speechConfig)
         setup.put("generationConfig", genConfig)
+
+        // Real-time voice transcriptions: both user's input and Maahi's output
+        setup.put("inputAudioTranscription", JSONObject())
+        setup.put("outputAudioTranscription", JSONObject())
 
         // Google Search Grounding Tool
         val toolsArray = JSONArray()
@@ -68,7 +79,9 @@ object GeminiLiveMessages {
         }
 
         root.put("setup", setup)
-        return root.toString()
+        val payload = root.toString()
+        Log.d(TAG, "Outgoing setup message: $payload")
+        return payload
     }
 
     fun buildRealtimeAudioChunk(pcmBytes: ByteArray, offset: Int, length: Int): String {
@@ -77,7 +90,7 @@ object GeminiLiveMessages {
         val realtimeInput = JSONObject()
         val mediaChunks = JSONArray().apply {
             put(JSONObject().apply {
-                put("mimeType", "audio/pcm")
+                put("mimeType", "audio/pcm;rate=16000")
                 put("data", base64Data)
             })
         }
@@ -103,59 +116,112 @@ object GeminiLiveMessages {
         clientContent.put("turns", turns)
         clientContent.put("turnComplete", true)
         root.put("clientContent", clientContent)
+        Log.d(TAG, "Outgoing clientContent text: $text")
         return root.toString()
     }
 
     fun parseServerMessage(jsonText: String): ServerTurnChunk? {
         return try {
             val json = JSONObject(jsonText)
-            var textDelta: StringBuilder? = null
+            Log.d(TAG, "Received message: $jsonText")
+
+            var isSetupComplete = false
+            var inputText: String? = null
+            var outputText: String? = null
             var pcmBytes: ByteArray? = null
             var interrupted = false
             var turnComplete = false
+            var generationComplete = false
             var searching = false
             var newHandle: String? = null
+            var serverError: String? = null
 
-            // Session Resumption update
+            // 1. Setup Complete acknowledgement
+            if (json.has("setupComplete")) {
+                Log.i(TAG, "setupComplete received from Gemini Live API")
+                isSetupComplete = true
+            }
+
+            // 2. Server Error frames
+            if (json.has("error")) {
+                val errObj = json.optJSONObject("error")
+                serverError = errObj?.optString("message") ?: json.getString("error")
+                Log.e(TAG, "Server error frame received: $serverError")
+            } else if (json.has("errorMessage")) {
+                serverError = json.optString("errorMessage")
+                Log.e(TAG, "Server errorMessage frame received: $serverError")
+            }
+
+            // 3. Session Resumption update
             if (json.has("sessionResumptionUpdate")) {
                 val updateObj = json.optJSONObject("sessionResumptionUpdate")
                 newHandle = updateObj?.optString("newHandle")
                     ?: updateObj?.optString("handle")
+                Log.d(TAG, "Resumption handle received: $newHandle")
             }
 
-            // Tool call or grounding
+            // 4. Tool call or grounding
             if (json.has("toolCall") || json.has("groundingMetadata")) {
                 searching = true
+                Log.d(TAG, "Tool activity detected")
             }
 
+            // 5. Server Content
             if (json.has("serverContent")) {
                 val serverContent = json.getJSONObject("serverContent")
 
                 if (serverContent.optBoolean("interrupted", false)) {
                     interrupted = true
+                    Log.w(TAG, "Interrupted signal (barge-in)")
                 }
                 if (serverContent.optBoolean("turnComplete", false)) {
                     turnComplete = true
+                    Log.i(TAG, "turnComplete: true")
+                }
+                if (serverContent.optBoolean("generationComplete", false)) {
+                    generationComplete = true
+                    Log.i(TAG, "generationComplete: true")
                 }
 
                 if (serverContent.has("groundingMetadata")) {
                     searching = true
                 }
 
+                // User speech transcription
+                if (serverContent.has("inputTranscription")) {
+                    val inputObj = serverContent.optJSONObject("inputTranscription")
+                    val transcript = inputObj?.optString("text").orEmpty()
+                    if (transcript.isNotEmpty()) {
+                        inputText = transcript
+                        Log.d(TAG, "User inputTranscription: $transcript")
+                    }
+                }
+
+                // Model speech transcription
+                if (serverContent.has("outputTranscription")) {
+                    val outputObj = serverContent.optJSONObject("outputTranscription")
+                    val transcript = outputObj?.optString("text").orEmpty()
+                    if (transcript.isNotEmpty()) {
+                        outputText = transcript
+                        Log.d(TAG, "Model outputTranscription: $transcript")
+                    }
+                }
+
+                // Model turn parts (Audio chunks and inline text)
                 if (serverContent.has("modelTurn")) {
                     val modelTurn = serverContent.getJSONObject("modelTurn")
                     val parts = modelTurn.optJSONArray("parts")
                     if (parts != null) {
+                        val textParts = StringBuilder()
                         for (i in 0 until parts.length()) {
                             val part = parts.optJSONObject(i) ?: continue
 
-                            // Text transcript delta
+                            // Model text part (if present)
                             if (part.has("text")) {
-                                if (textDelta == null) textDelta = StringBuilder()
-                                textDelta.append(part.getString("text"))
+                                textParts.append(part.getString("text"))
                             }
 
-                            // Audio PCM chunk
+                            // Model PCM audio part (24kHz little-endian mono)
                             if (part.has("inlineData")) {
                                 val inlineData = part.getJSONObject("inlineData")
                                 val base64Data = inlineData.optString("data")
@@ -169,19 +235,27 @@ object GeminiLiveMessages {
                                 }
                             }
                         }
+                        if (textParts.isNotEmpty() && outputText == null) {
+                            outputText = textParts.toString()
+                        }
                     }
                 }
             }
 
             ServerTurnChunk(
-                text = textDelta?.toString(),
+                isSetupComplete = isSetupComplete,
+                inputText = inputText,
+                outputText = outputText,
                 audioBytes = pcmBytes,
                 isInterrupted = interrupted,
                 isTurnComplete = turnComplete,
+                isGenerationComplete = generationComplete,
                 isSearching = searching,
-                newResumptionHandle = newHandle
+                newResumptionHandle = newHandle,
+                serverError = serverError
             )
         } catch (e: Exception) {
+            Log.e(TAG, "Error parsing server message", e)
             null
         }
     }

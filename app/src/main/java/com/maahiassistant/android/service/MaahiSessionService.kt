@@ -1,5 +1,6 @@
 package com.maahiassistant.android.service
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationManager
@@ -7,6 +8,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
@@ -17,6 +19,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.maahiassistant.android.MaahiApplication
 import com.maahiassistant.android.R
 import com.maahiassistant.android.data.api.GeminiLiveWebSocketClient
@@ -41,7 +44,7 @@ import kotlinx.coroutines.launch
 class MaahiSessionService : Service() {
 
     companion object {
-        private const val TAG = "MaahiSessionService"
+        private const val TAG = "MaahiLive"
         const val NOTIFICATION_ID = 2001
 
         const val ACTION_START_SESSION = "com.maahiassistant.android.START_SESSION"
@@ -72,6 +75,9 @@ class MaahiSessionService : Service() {
 
         private val _audioOutputLevel = MutableStateFlow(0f)
         val audioOutputLevel: StateFlow<Float> = _audioOutputLevel.asStateFlow()
+
+        private val _currentUserText = MutableStateFlow("")
+        val currentUserText: StateFlow<String> = _currentUserText.asStateFlow()
 
         private val _currentAssistantText = MutableStateFlow("")
         val currentAssistantText: StateFlow<String> = _currentAssistantText.asStateFlow()
@@ -137,7 +143,8 @@ class MaahiSessionService : Service() {
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     private var reconnectJob: Job? = null
-    private val liveTurnBuffer = StringBuilder()
+    private val liveUserBuffer = StringBuilder()
+    private val liveAssistantBuffer = StringBuilder()
 
     inner class LocalBinder : Binder() {
         fun getService(): MaahiSessionService = this@MaahiSessionService
@@ -196,7 +203,7 @@ class MaahiSessionService : Service() {
     private fun initAudioAndWebSocket() {
         val app = MaahiApplication.instance
 
-        // Audio Playback
+        // Audio Playback: initialize and start playback thread (ready for 24kHz audio)
         audioPlayback = AudioPlaybackManager(this) { isSpeaking, outputLevel ->
             _audioOutputLevel.value = outputLevel
             if (isSpeaking) {
@@ -217,7 +224,7 @@ class MaahiSessionService : Service() {
         audioPlayback?.setSpeakerMode(_isSpeakerOn.value)
         audioPlayback?.start(serviceScope)
 
-        // Audio Capture
+        // Audio Capture: prepared, but NOT started until setupComplete arrives
         audioCapture = AudioCaptureManager(
             onAudioChunk = { buffer, offset, length ->
                 webSocketClient?.sendAudioChunk(buffer, offset, length)
@@ -229,16 +236,41 @@ class MaahiSessionService : Service() {
                 Log.e(TAG, "Audio capture error: $error")
                 _errorMessage.value = error
                 _orbState.value = SessionOrbState.ERROR
+                serviceScope.launch {
+                    app.chatRepository.addSystemNote("Microphone error: $error")
+                }
             }
         )
         audioCapture?.setMute(_isMuted.value)
-        audioCapture?.start(serviceScope)
 
         // WebSocket Client
         webSocketClient = GeminiLiveWebSocketClient(object : GeminiLiveWebSocketClient.LiveSessionListener {
             override fun onConnected() {
                 serviceScope.launch {
+                    Log.i(TAG, "WebSocket connected, waiting for setupComplete...")
+                }
+            }
+
+            override fun onSetupComplete() {
+                serviceScope.launch {
+                    Log.i(TAG, "setupComplete confirmed by Gemini. Starting audio capture...")
                     val wasReconnecting = _connectionStatus.value == ConnectionStatus.RECONNECTING
+
+                    // Only start mic capture after setupComplete has arrived
+                    val hasMic = ContextCompat.checkSelfPermission(
+                        this@MaahiSessionService,
+                        Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (hasMic) {
+                        audioCapture?.start(serviceScope)
+                    } else {
+                        val permErr = "Microphone permission not granted"
+                        Log.e(TAG, permErr)
+                        _errorMessage.value = permErr
+                        app.chatRepository.addSystemNote(permErr)
+                    }
+
                     if (_isMuted.value) {
                         _orbState.value = SessionOrbState.MUTED
                         _connectionStatus.value = ConnectionStatus.MUTED
@@ -246,6 +278,9 @@ class MaahiSessionService : Service() {
                         _orbState.value = SessionOrbState.LISTENING
                         _connectionStatus.value = ConnectionStatus.LISTENING
                     }
+                    _errorMessage.value = null
+                    updateNotification(isMuted = _isMuted.value, isSpeaking = false)
+
                     if (wasReconnecting) {
                         app.chatRepository.addSystemNote("Reconnected")
                     }
@@ -259,13 +294,33 @@ class MaahiSessionService : Service() {
                         resumptionHandle = handle
                     }
 
-                    // Searching chip update
+                    // Tool activity / Search grounding indicator
                     if (chunk.isSearching) {
                         _isToolSearching.value = true
                     }
 
+                    // User speech transcription delta
+                    chunk.inputText?.let { userText ->
+                        liveUserBuffer.append(userText)
+                        _currentUserText.value = liveUserBuffer.toString()
+                    }
+
+                    // Model speech transcription delta
+                    chunk.outputText?.let { assistantText ->
+                        liveAssistantBuffer.append(assistantText)
+                        _currentAssistantText.value = liveAssistantBuffer.toString()
+                    }
+
+                    // Audio output bytes (24kHz PCM)
+                    chunk.audioBytes?.let { pcm ->
+                        audioPlayback?.enqueueAudio(pcm)
+                        _orbState.value = SessionOrbState.SPEAKING
+                        _connectionStatus.value = ConnectionStatus.SPEAKING
+                    }
+
                     // Barge-in interruption
                     if (chunk.isInterrupted) {
+                        Log.w(TAG, "Interruption triggered. Flushing audio playback.")
                         audioPlayback?.bargeIn()
                         commitAssistantTurn()
                         _isToolSearching.value = false
@@ -273,21 +328,13 @@ class MaahiSessionService : Service() {
                             _orbState.value = SessionOrbState.LISTENING
                             _connectionStatus.value = ConnectionStatus.LISTENING
                         }
+                        updateNotification(isMuted = _isMuted.value, isSpeaking = false)
                     }
 
-                    // Audio output bytes
-                    chunk.audioBytes?.let { pcm ->
-                        audioPlayback?.enqueueAudio(pcm)
-                    }
-
-                    // Assistant text delta
-                    chunk.text?.let { text ->
-                        liveTurnBuffer.append(text)
-                        _currentAssistantText.value = liveTurnBuffer.toString()
-                    }
-
-                    // Turn complete signal
-                    if (chunk.isTurnComplete) {
+                    // Turn complete or Generation complete
+                    if (chunk.isTurnComplete || chunk.isGenerationComplete) {
+                        Log.i(TAG, "Turn/generation complete signal received.")
+                        commitUserTurn()
                         commitAssistantTurn()
                         _isToolSearching.value = false
                     }
@@ -296,13 +343,13 @@ class MaahiSessionService : Service() {
 
             override fun onError(message: String, isAuthError: Boolean) {
                 serviceScope.launch {
-                    Log.e(TAG, "WebSocket error: $message, isAuthError: $isAuthError")
+                    Log.e(TAG, "Live session error: $message, isAuth: $isAuthError")
                     _errorMessage.value = message
                     _orbState.value = SessionOrbState.ERROR
                     _connectionStatus.value = ConnectionStatus.ERROR
+                    app.chatRepository.addSystemNote(message)
 
                     if (!isAuthError && _isSessionActive.value) {
-                        // Silent reconnection attempt if session is still meant to be active
                         scheduleReconnection()
                     }
                 }
@@ -310,6 +357,14 @@ class MaahiSessionService : Service() {
 
             override fun onClosed(code: Int, reason: String) {
                 serviceScope.launch {
+                    Log.i(TAG, "Session closed: code=$code, reason=$reason")
+                    if (code != 1000) {
+                        val closeMsg = "Connection closed ($code: $reason)"
+                        _errorMessage.value = closeMsg
+                        _orbState.value = SessionOrbState.ERROR
+                        _connectionStatus.value = ConnectionStatus.ERROR
+                        app.chatRepository.addSystemNote(closeMsg)
+                    }
                     if (_isSessionActive.value && code != 1000) {
                         scheduleReconnection()
                     }
@@ -324,9 +379,13 @@ class MaahiSessionService : Service() {
         val app = MaahiApplication.instance
         val apiKey = app.settingsRepository.getApiKey().orEmpty()
         if (apiKey.isBlank()) {
-            _errorMessage.value = "Gemini API key is missing. Add it in Settings."
+            val keyErr = "Gemini API key is missing. Please add your key in Settings."
+            _errorMessage.value = keyErr
             _orbState.value = SessionOrbState.ERROR
             _connectionStatus.value = ConnectionStatus.ERROR
+            serviceScope.launch {
+                app.chatRepository.addSystemNote(keyErr)
+            }
             return
         }
 
@@ -334,6 +393,7 @@ class MaahiSessionService : Service() {
             val modelId = app.settingsRepository.modelId.first()
             val voiceName = app.settingsRepository.voice.first()
 
+            Log.i(TAG, "Connecting session with model='$modelId', voice='$voiceName'...")
             webSocketClient?.connect(
                 apiKey = apiKey,
                 modelId = modelId,
@@ -351,14 +411,25 @@ class MaahiSessionService : Service() {
         }
     }
 
+    private fun commitUserTurn() {
+        val text = liveUserBuffer.toString().trim()
+        if (text.isNotEmpty()) {
+            serviceScope.launch {
+                MaahiApplication.instance.chatRepository.saveUserMessage(text)
+            }
+            liveUserBuffer.clear()
+            _currentUserText.value = ""
+        }
+    }
+
     private fun commitAssistantTurn() {
-        val text = liveTurnBuffer.toString().trim()
+        val text = liveAssistantBuffer.toString().trim()
         if (text.isNotEmpty()) {
             val searching = _isToolSearching.value
             serviceScope.launch {
                 MaahiApplication.instance.chatRepository.saveMaahiMessage(text, searching)
             }
-            liveTurnBuffer.clear()
+            liveAssistantBuffer.clear()
             _currentAssistantText.value = ""
         }
     }
@@ -412,6 +483,7 @@ class MaahiSessionService : Service() {
         _audioInputLevel.value = 0f
         _audioOutputLevel.value = 0f
         _isToolSearching.value = false
+        commitUserTurn()
         commitAssistantTurn()
 
         reconnectJob?.cancel()

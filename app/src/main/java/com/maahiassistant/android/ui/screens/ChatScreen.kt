@@ -70,6 +70,7 @@ fun ChatScreen(
     modifier: Modifier = Modifier
 ) {
     val messages by viewModel.chatMessages.collectAsState()
+    val liveUserText by viewModel.currentUserText.collectAsState()
     val liveAssistantText by viewModel.currentAssistantText.collectAsState()
     val isToolSearching by viewModel.isToolSearching.collectAsState()
 
@@ -79,9 +80,11 @@ fun ChatScreen(
     val listState = rememberLazyListState()
 
     // Auto-scroll to bottom on new message
-    LaunchedEffect(messages.size, liveAssistantText) {
-        if (messages.isNotEmpty() || liveAssistantText.isNotEmpty()) {
-            val target = messages.size + (if (liveAssistantText.isNotEmpty()) 1 else 0)
+    LaunchedEffect(messages.size, liveUserText, liveAssistantText) {
+        if (messages.isNotEmpty() || liveUserText.isNotEmpty() || liveAssistantText.isNotEmpty()) {
+            val target = messages.size +
+                    (if (liveUserText.isNotEmpty()) 1 else 0) +
+                    (if (liveAssistantText.isNotEmpty()) 1 else 0)
             if (target > 0) {
                 listState.animateScrollToItem(target - 1)
             }
@@ -177,6 +180,18 @@ fun ChatScreen(
                         role = msg.role,
                         text = msg.text,
                         isSearching = msg.isSearching
+                    )
+                }
+            }
+
+            // Live User Stream Bubble
+            if (liveUserText.isNotEmpty()) {
+                item {
+                    ChatBubble(
+                        role = "user",
+                        text = liveUserText,
+                        isSearching = false,
+                        isStreaming = true
                     )
                 }
             }
