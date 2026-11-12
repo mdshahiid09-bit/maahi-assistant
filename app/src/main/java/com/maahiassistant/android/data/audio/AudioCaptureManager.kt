@@ -110,7 +110,6 @@ class AudioCaptureManager(
         }
         LiveLogManager.info("AudioRecord", "Microphone recording stopped cleanly")
     }
-    }
 
     fun release() {
         stop()

@@ -162,8 +162,6 @@ class AudioPlaybackManager(
         }
         audioFocusHelper.abandonFocus()
         onSpeakingState(false, 0f)
-        LiveLogManager.info("AudioTrack", "AudioTrack stopped cleanly")
-    }
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -173,6 +171,7 @@ class AudioPlaybackManager(
         } catch (e: Exception) {
             // Ignore
         }
+        LiveLogManager.info("AudioTrack", "AudioTrack stopped cleanly")
     }
 
     fun release() {
