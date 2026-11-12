@@ -37,10 +37,13 @@ class GeminiLiveWebSocketClient(
     private val isConnected = AtomicBoolean(false)
     private val isSetupComplete = AtomicBoolean(false)
 
+    // IMPORTANT: No OkHttp pingInterval to avoid "sent ping but didn't receive pong within 15000ms"
+    // Rely on readTimeout 0 and server-level messages & reconnects instead.
     private val client = OkHttpClient.Builder()
-        .pingInterval(15, TimeUnit.SECONDS)
+        .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
-        .connectTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(0, TimeUnit.MILLISECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     fun connect(
@@ -69,7 +72,7 @@ class GeminiLiveWebSocketClient(
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 isConnected.set(true)
                 isSetupComplete.set(false)
-                Log.i(TAG, "WebSocket connected successfully. Sending initial setup message...")
+                Log.i(TAG, "WebSocket connection established. Sending initial setup message...")
 
                 // Send setup message first
                 val setupPayload = GeminiLiveMessages.buildSetupMessage(
@@ -89,12 +92,14 @@ class GeminiLiveWebSocketClient(
                 if (chunk != null) {
                     if (chunk.isSetupComplete) {
                         isSetupComplete.set(true)
+                        Log.i(TAG, "Gemini session setup complete! Audio and text streaming unblocked.")
                         scope.launch {
                             listener.onSetupComplete()
                         }
                     }
 
                     if (chunk.serverError != null) {
+                        Log.e(TAG, "Server error reported in message payload: ${chunk.serverError}")
                         scope.launch {
                             listener.onError(chunk.serverError, false)
                         }
@@ -132,9 +137,16 @@ class GeminiLiveWebSocketClient(
                     else -> t.message ?: "Connection failure"
                 }
 
-                Log.e(TAG, "WebSocket failure: $finalError", t)
+                // Strict security: ensure API key is never included in error logs or UI messages
+                val sanitizedError = if (cleanKey.isNotBlank() && finalError.contains(cleanKey)) {
+                    finalError.replace(cleanKey, "[REDACTED]")
+                } else {
+                    finalError
+                }
+
+                Log.e(TAG, "WebSocket failure: $sanitizedError")
                 scope.launch {
-                    listener.onError(finalError, isAuthError)
+                    listener.onError(sanitizedError, isAuthError)
                 }
             }
 
@@ -162,7 +174,9 @@ class GeminiLiveWebSocketClient(
 
     fun sendTextMessage(text: String): Boolean {
         val ws = webSocket ?: return false
-        if (!isConnected.get()) return false
+        if (!isConnected.get() || !isSetupComplete.get()) {
+            return false
+        }
         val message = GeminiLiveMessages.buildClientContentTextMessage(text)
         return ws.send(message)
     }

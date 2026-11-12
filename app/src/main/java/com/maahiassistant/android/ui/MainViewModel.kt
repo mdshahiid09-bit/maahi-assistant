@@ -56,7 +56,7 @@ class MainViewModel(
 
     // Settings
     val modelId: StateFlow<String> = settingsRepository.modelId
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gemini-3.8-live")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gemini-2.0-flash-exp")
 
     val voice: StateFlow<String> = settingsRepository.voice
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Kore")
@@ -122,6 +122,14 @@ class MainViewModel(
         }
     }
 
+    fun sendTextMessage(context: Context, text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            MaahiSessionService.sendText(context, trimmed)
+        }
+    }
+
     fun sendTextMessage(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
@@ -151,9 +159,13 @@ class MainViewModel(
         viewModelScope.launch {
             val result = settingsRepository.testApiKey(trimmed)
             if (result.isSuccess) {
+                val validation = result.getOrNull()
                 settingsRepository.saveApiKey(trimmed)
+                if (validation?.selectedBidiModel != null) {
+                    settingsRepository.setModelId(validation.selectedBidiModel)
+                }
                 refreshKeyStatus()
-                _keyTestState.value = KeyTestState.Success(result.getOrDefault("Key is valid and saved!"))
+                _keyTestState.value = KeyTestState.Success(validation?.message ?: "Key is valid and saved!")
             } else {
                 val errorMsg = result.exceptionOrNull()?.message ?: "Key validation failed"
                 _keyTestState.value = KeyTestState.Error(errorMsg)

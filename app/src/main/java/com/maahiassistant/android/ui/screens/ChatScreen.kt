@@ -69,6 +69,7 @@ fun ChatScreen(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val messages by viewModel.chatMessages.collectAsState()
     val liveUserText by viewModel.currentUserText.collectAsState()
     val liveAssistantText by viewModel.currentAssistantText.collectAsState()
@@ -240,7 +241,7 @@ fun ChatScreen(
                 keyboardActions = KeyboardActions(
                     onSend = {
                         if (inputText.isNotBlank()) {
-                            viewModel.sendTextMessage(inputText)
+                            viewModel.sendTextMessage(context, inputText)
                             inputText = ""
                         }
                     }
@@ -252,7 +253,7 @@ fun ChatScreen(
             IconButton(
                 onClick = {
                     if (inputText.isNotBlank()) {
-                        viewModel.sendTextMessage(inputText)
+                        viewModel.sendTextMessage(context, inputText)
                         inputText = ""
                     }
                 },

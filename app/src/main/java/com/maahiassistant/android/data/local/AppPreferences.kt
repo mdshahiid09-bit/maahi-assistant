@@ -21,14 +21,16 @@ class AppPreferences(private val context: Context) {
         val KEY_KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
 
-        const val DEFAULT_MODEL_ID = "gemini-3.8-live"
+        const val DEFAULT_MODEL_ID = "gemini-2.0-flash-exp"
         const val DEFAULT_VOICE = "Kore"
         const val DEFAULT_USE_SPEAKER = true
         const val DEFAULT_KEEP_SCREEN_ON = true
     }
 
     val modelIdFlow: Flow<String> = context.appDataStore.data.map { prefs ->
-        prefs[KEY_MODEL_ID] ?: DEFAULT_MODEL_ID
+        val raw = prefs[KEY_MODEL_ID] ?: DEFAULT_MODEL_ID
+        // Automatically migrate legacy or guessed model names to verified live model
+        if (raw == "gemini-3.8-live" || raw.isBlank()) DEFAULT_MODEL_ID else raw
     }
 
     val voiceFlow: Flow<String> = context.appDataStore.data.map { prefs ->
@@ -48,8 +50,9 @@ class AppPreferences(private val context: Context) {
     }
 
     suspend fun setModelId(modelId: String) {
+        val clean = modelId.trim().removePrefix("models/")
         context.appDataStore.edit { prefs ->
-            prefs[KEY_MODEL_ID] = modelId.trim().ifEmpty { DEFAULT_MODEL_ID }
+            prefs[KEY_MODEL_ID] = if (clean.isBlank()) DEFAULT_MODEL_ID else clean
         }
     }
 
@@ -77,9 +80,6 @@ class AppPreferences(private val context: Context) {
         }
     }
 
-    /**
-     * Resets settings back to defaults, keeps onboarding flag and chat intact.
-     */
     suspend fun resetSettings() {
         context.appDataStore.edit { prefs ->
             prefs[KEY_MODEL_ID] = DEFAULT_MODEL_ID
@@ -89,9 +89,6 @@ class AppPreferences(private val context: Context) {
         }
     }
 
-    /**
-     * Clears all preferences completely.
-     */
     suspend fun clearAll() {
         context.appDataStore.edit { prefs ->
             prefs.clear()

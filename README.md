@@ -56,8 +56,8 @@ Maahi is an intelligent, conversational voice assistant for Android, built with 
 
 ### Settings & Security
 * **Encrypted API Key Storage:** Stored using `EncryptedSharedPreferences` backed by the Android Keystore.
-* **Save & Test Key:** Validates the key with a real minimal REST call to Google AI Studio and displays real API feedback. Includes a "How to get your key" guide and an "Open Google AI Studio" button.
-* **Live Model ID:** Configurable model identifier (default: `gemini-3.8-live`).
+* **Save & Test Key:** Validates the key with a real minimal REST call to Google AI Studio, queries the models list endpoint, automatically discovers models supporting `bidiGenerateContent`, and displays real API feedback. Includes a "How to get your key" guide and an "Open Google AI Studio" button.
+* **Live Model ID:** Configurable model identifier (default: `gemini-2.0-flash-exp`, auto-updated when testing key).
 * **Voice Selection:** Choose between `Kore` (default), `Puck`, `Charon`, `Fenrir`, or `Aoede`.
 * **Speaker / Earpiece Switch:** Toggle default audio routing.
 * **Keep Screen Awake:** Keeps screen illuminated during active voice sessions.

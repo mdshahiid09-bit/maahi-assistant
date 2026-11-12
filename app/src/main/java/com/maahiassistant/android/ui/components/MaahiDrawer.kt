@@ -135,7 +135,7 @@ fun MaahiDrawerSheet(
 
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = "Maahi v1.0.1 (Phase 1)",
+                text = "Maahi v1.0.2 (Phase 1)",
                 fontSize = 11.sp,
                 color = ClayTextSecondary,
                 modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)

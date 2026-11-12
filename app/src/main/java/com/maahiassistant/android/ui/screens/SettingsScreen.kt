@@ -385,7 +385,7 @@ fun SettingsScreen(
                     color = ClayTextPrimary
                 )
                 Text(
-                    text = "Gemini multimodal live streaming model (default gemini-3.8-live)",
+                    text = "Gemini multimodal live streaming model (default gemini-2.0-flash-exp or auto-detected)",
                     fontSize = 11.5.sp,
                     color = ClayTextSecondary
                 )

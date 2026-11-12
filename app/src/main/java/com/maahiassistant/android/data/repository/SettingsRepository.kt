@@ -1,6 +1,7 @@
 package com.maahiassistant.android.data.repository
 
 import com.maahiassistant.android.data.api.GeminiRestValidator
+import com.maahiassistant.android.data.api.KeyValidationResult
 import com.maahiassistant.android.data.local.AppPreferences
 import com.maahiassistant.android.data.local.SecureKeyStore
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +30,7 @@ class SettingsRepository(
         secureKeyStore.clearApiKey()
     }
 
-    suspend fun testApiKey(apiKey: String): Result<String> {
+    suspend fun testApiKey(apiKey: String): Result<KeyValidationResult> {
         return validator.validateKey(apiKey)
     }
 

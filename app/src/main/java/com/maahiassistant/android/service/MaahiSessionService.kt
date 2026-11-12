@@ -92,6 +92,18 @@ class MaahiSessionService : Service() {
         var activeInstance: MaahiSessionService? = null
             private set
 
+        private val pendingGlobalQueue = java.util.concurrent.ConcurrentLinkedQueue<String>()
+
+        fun sendText(context: Context, text: String) {
+            val instance = activeInstance
+            if (instance != null) {
+                instance.sendTextMessage(text)
+            } else {
+                pendingGlobalQueue.offer(text)
+                startService(context)
+            }
+        }
+
         fun sendText(text: String) {
             activeInstance?.sendTextMessage(text)
         }
@@ -145,6 +157,7 @@ class MaahiSessionService : Service() {
     private var reconnectJob: Job? = null
     private val liveUserBuffer = StringBuilder()
     private val liveAssistantBuffer = StringBuilder()
+    private val pendingTextQueue = java.util.concurrent.ConcurrentLinkedQueue<String>()
 
     inner class LocalBinder : Binder() {
         fun getService(): MaahiSessionService = this@MaahiSessionService
@@ -255,6 +268,18 @@ class MaahiSessionService : Service() {
                 serviceScope.launch {
                     Log.i(TAG, "setupComplete confirmed by Gemini. Starting audio capture...")
                     val wasReconnecting = _connectionStatus.value == ConnectionStatus.RECONNECTING
+
+                    // Send any queued text messages
+                    while (pendingGlobalQueue.isNotEmpty()) {
+                        val pending = pendingGlobalQueue.poll() ?: break
+                        Log.i(TAG, "Sending global queued clientContent text: $pending")
+                        webSocketClient?.sendTextMessage(pending)
+                    }
+                    while (pendingTextQueue.isNotEmpty()) {
+                        val pending = pendingTextQueue.poll() ?: break
+                        Log.i(TAG, "Sending queued clientContent text: $pending")
+                        webSocketClient?.sendTextMessage(pending)
+                    }
 
                     // Only start mic capture after setupComplete has arrived
                     val hasMic = ContextCompat.checkSelfPermission(
@@ -404,10 +429,17 @@ class MaahiSessionService : Service() {
     }
 
     fun sendTextMessage(text: String) {
-        if (text.isBlank()) return
+        val trimmed = text.trim()
+        if (trimmed.isBlank()) return
         serviceScope.launch {
-            MaahiApplication.instance.chatRepository.saveUserMessage(text)
-            webSocketClient?.sendTextMessage(text)
+            MaahiApplication.instance.chatRepository.saveUserMessage(trimmed)
+            if (webSocketClient?.isReadyForAudio() == true) {
+                Log.i(TAG, "Live session is ready. Sending clientContent text immediately: $trimmed")
+                webSocketClient?.sendTextMessage(trimmed)
+            } else {
+                Log.i(TAG, "Live session setup in progress. Queueing text until setupComplete: $trimmed")
+                pendingTextQueue.offer(trimmed)
+            }
         }
     }
 

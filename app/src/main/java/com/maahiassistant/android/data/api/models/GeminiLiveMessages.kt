@@ -30,7 +30,7 @@ object GeminiLiveMessages {
         val root = JSONObject()
         val setup = JSONObject()
 
-        val cleanModel = modelId.trim()
+        val cleanModel = modelId.trim().ifEmpty { "gemini-2.0-flash-exp" }
         val formattedModel = if (cleanModel.startsWith("models/")) cleanModel else "models/$cleanModel"
         setup.put("model", formattedModel)
 
@@ -52,6 +52,16 @@ object GeminiLiveMessages {
         setup.put("inputAudioTranscription", JSONObject())
         setup.put("outputAudioTranscription", JSONObject())
 
+        // System Instruction - Jarvis persona
+        val systemInstruction = JSONObject()
+        val partsArray = JSONArray().apply {
+            put(JSONObject().apply {
+                put("text", "You are Maahi, an intelligent, empathetic, and warm AI voice assistant like Jarvis. Speak naturally with concise, conversational phrasing suitable for real-time speech dialogue. Keep responses direct and helpful. When live Google Search is needed, weave answers in smoothly.")
+            })
+        }
+        systemInstruction.put("parts", partsArray)
+        setup.put("systemInstruction", systemInstruction)
+
         // Google Search Grounding Tool
         val toolsArray = JSONArray()
         val googleSearchTool = JSONObject().apply {
@@ -60,17 +70,7 @@ object GeminiLiveMessages {
         toolsArray.put(googleSearchTool)
         setup.put("tools", toolsArray)
 
-        // System Instruction
-        val systemInstruction = JSONObject()
-        val partsArray = JSONArray().apply {
-            put(JSONObject().apply {
-                put("text", "You are Maahi, an intelligent, empathetic, and warm AI voice assistant. Speak naturally with concise, conversational phrasing suitable for real-time speech dialogue. Keep responses direct and helpful. When live Google Search is needed, weave answers in smoothly.")
-            })
-        }
-        systemInstruction.put("parts", partsArray)
-        setup.put("systemInstruction", systemInstruction)
-
-        // Session Resumption
+        // Session Resumption (if present)
         if (!resumptionHandle.isNullOrBlank()) {
             val sessionResumption = JSONObject().apply {
                 put("handle", resumptionHandle)
@@ -145,10 +145,17 @@ object GeminiLiveMessages {
             // 2. Server Error frames
             if (json.has("error")) {
                 val errObj = json.optJSONObject("error")
-                serverError = errObj?.optString("message") ?: json.getString("error")
+                serverError = if (errObj != null) {
+                    val code = errObj.optInt("code", 0)
+                    val msg = errObj.optString("message")
+                    val status = errObj.optString("status")
+                    "Gemini Error ($code $status): $msg".trim()
+                } else {
+                    json.optString("error")
+                }
                 Log.e(TAG, "Server error frame received: $serverError")
             } else if (json.has("errorMessage")) {
-                serverError = json.optString("errorMessage")
+                serverError = "Gemini Error: ${json.optString("errorMessage")}"
                 Log.e(TAG, "Server errorMessage frame received: $serverError")
             }
 
